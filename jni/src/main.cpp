@@ -76,20 +76,16 @@ int main(){
   args.group = NULL; // you might want to assign the java thread to a ThreadGroup
   JNIEnv* jni_env;
 
-  int ret = ctx.vm->AttachCurrentThread(&jni_env, &args);
-  printf("0x%lx\n", libart->start);
-  if(ret == JNI_OK){
-    printf("Suceeded\n");
-  }else {
-    printf("Failed\n");
-  }
+  
+  printf("Runtime: %p\n", ArtResolver::getRuntime());
+  printf("ClassLinker: %p\n", ArtResolver::getClassLinker());
+  printf("Thread: %p\n", ArtResolver::getThread());
 
-  printf("Runtime: %p\n", getRuntime());
-  printf("ClassLinker: %p\n", getClassLinker());
-  void** thread = (void**)getThread();
+  ArtResolver art_resolver(libart);
 
+  art_resolver.enumerateClasses();
+  //art_resolver.printClassNames();
 
-
-  printClasses(libart);
+  //printClasses(libart);
   return 0;
 }
