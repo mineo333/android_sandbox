@@ -12,6 +12,7 @@
 typedef void* classlinker;
 typedef void* art_runtime;
 typedef void* art_thread;
+typedef void* jni_id_manager;
 /**
 A heap reference is a compressed 32 bit pointer: https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/mirror/object_reference.h;l=216;drc=13d7a47602f63cde716276908531eecb85813f7a
 
@@ -73,15 +74,22 @@ typedef struct _ArtMethod {
 } ArtMethod;
 
 
-//Based on: https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/mirror/dex_cache.h;l=257;drc=06bd5d4af5ec3ac61904303953b6f96bdf6eae4c;bpv=0;bpt=1
-typedef struct _DexCache {
-    Object object; //object is a superclass
+typedef struct _Throwable {
+    Object object; //object is the superclass;
+    heap_ref backtrace;
+    heap_ref cause;
+    heap_ref detail_message;
+    heap_ref stack_trace;
+    heap_ref suppressed_exceptions;
 
-    heap_ref class_loader;
-    heap_ref location;
+    void printMessage();
+} Throwable;
 
-  //  DexFile* dex_file;
-} DexCache;
+
+//Difference between jni_env and exception: https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/thread.h;l=2177;drc=06bd5d4af5ec3ac61904303953b6f96bdf6eae4c
+#define SIZE_OF_MANAGED_STACK (3)
+#define EXCEPTION_DIFF (3 + SIZE_OF_MANAGED_STACK)
+//offset is EXCEPTION_OFFSET*sizeof(size_t)
 
 
 
@@ -89,6 +97,11 @@ typedef jobject (*AddGlobalRef)(JavaVM*, art_thread, jobject); //https://cs.andr
 typedef void (*visitClasses)(classlinker, struct ClassVisitor*); //https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/class_linker.cc;l=2543;drc=f13bf4bc97e7df89822d4a35376f6f26d65fa3ce;bpv=0;bpt=1
 typedef std::string (*PrettyMethod)(ArtMethod*, bool); //https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/art_method.h;l=1026?q=Pretty&sq=&ss=android%2Fplatform%2Fsuperproject%2Fmain:art%2F
 
+typedef jmethodID (*GetCanonicalMethod)(ArtMethod*, size_t); //https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/art_method.cc;l=69;drc=06bd5d4af5ec3ac61904303953b6f96bdf6eae4c;bpv=0;bpt=1
+
+//Note the above doesn't actually return jmethodID, but we end up casting it here: https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/jni/jni_internal.h;l=138;drc=06bd5d4af5ec3ac61904303953b6f96bdf6eae4c
+
+typedef std::string (*Dump)(Throwable*); //https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/mirror/throwable.h;l=40;drc=b7225f7d6ea0bdf6524922a6d852d2477fc6881c;bpv=0;bpt=1
 
 extern "C" classlinker getClassLinker();
 
@@ -117,8 +130,10 @@ public:
     static classlinker getClassLinker();
     static art_runtime getRuntime();
     static art_thread getThread();
+    static Throwable* getException();
     static int getAPI();
     static void getVersion(char* buf);
+    static void printException();
     void enumerateClasses();
     void printClassNames();
     jobject getClassHandle(char* name);
@@ -128,6 +143,8 @@ public:
     static AddGlobalRef add_global_ref; 
     static visitClasses visit_classes;
     static PrettyMethod pretty_method;
+    static GetCanonicalMethod get_canonical_method;
+    static Dump dump_exception;
     static std::vector<jobject>* classHandles;
     static std::vector<ArtClass*>* rawClasses;
 private:

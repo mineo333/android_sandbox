@@ -84,16 +84,22 @@ int main(){
   ArtResolver art_resolver(libart);
 
   art_resolver.enumerateClasses();
- // art_resolver.printClassNames();
 
   
-  //art_resolver.printMethodsForClass("android.app.ActivityThread");
+ // art_resolver.printMethodsForClass("android.app.ActivityThread");
   jmethodID systemMain = art_resolver.findMethodClass("android.app.ActivityThread", "systemMain");
+  
+  printf("system main: %p\n", systemMain);
   jclass activity_thread = ctx.env->FindClass("android/app/ActivityThread");
-  jobject activityThreadObj = ctx.env->CallStaticObjectMethod(activity_thread, systemMain);
+  jmethodID ctr = ctx.env->GetMethodID(activity_thread, "<init>", "()V"); 
+  printf("constructor: %p\n", ctr);
+  jobject activityThreadObj = ctx.env->NewObject(activity_thread, ctr);
+ // jobject activityThreadObj = ctx.env->CallStaticObjectMethod(activity_thread, systemMain);
 
-  printf("Activity Thread: %p\n", activityThreadObj);
-
+ // printf("Activity Thread: %p\n", activityThreadObj);
+  Throwable* exception = ArtResolver::getException();
+  //printf("Exception Cause: %p\n", exception->cause);
+  exception->printMessage();
   //
 
   //printClasses(libart);

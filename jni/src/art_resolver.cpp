@@ -13,6 +13,8 @@
 AddGlobalRef ArtResolver::add_global_ref;
 visitClasses ArtResolver::visit_classes;
 PrettyMethod ArtResolver::pretty_method;
+Dump ArtResolver::dump_exception;
+GetCanonicalMethod ArtResolver::get_canonical_method;
 std::vector<jobject>* ArtResolver::classHandles;
 std::vector<ArtClass*>* ArtResolver::rawClasses;
 
@@ -44,6 +46,15 @@ ArtResolver::ArtResolver(struct proc_lib* libart){
         pretty_method = (PrettyMethod)find_dyn_symbol(this->libart, "_ZN3art9ArtMethod12PrettyMethodEPS0_b"); //ArtMethod::PrettyMethod
     }
 
+    if(!ArtResolver::get_canonical_method){
+        get_canonical_method = (GetCanonicalMethod)find_dyn_symbol(this->libart, "_ZN3art9ArtMethod18GetCanonicalMethodENS_11PointerSizeE"); //ArtMethod::PrettyMethod
+    }
+
+    if(!ArtResolver::dump_exception){
+        dump_exception = (Dump)find_dyn_symbol(this->libart, "_ZN3art6mirror9Throwable4DumpEv"); 
+    }
+
+
     if(!ArtResolver::classHandles){
        ArtResolver::classHandles = new std::vector<jobject>();
     }
@@ -69,8 +80,23 @@ art_thread ArtResolver::getThread(){
     void** tls = __get_tls();
 #define TLS_SLOT_ART_THREAD_SELF  7
     return (art_thread)tls[TLS_SLOT_ART_THREAD_SELF];
-
 }
+
+Throwable* ArtResolver::getException(){
+    /*https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/thread.h;l=2177;drc=06bd5d4af5ec3ac61904303953b6f96bdf6eae4c
+    
+    We are trying to find exception
+    */
+    void** iter = (void**)ArtResolver::getThread();
+    while(true){
+        if(*iter == ctx.env){
+            break;
+        }
+        iter++;
+    }
+    return (Throwable*)*(iter-EXCEPTION_DIFF); 
+}
+
 
 classlinker ArtResolver::getClassLinker(){
     art_runtime runtime = getRuntime();
@@ -213,7 +239,7 @@ void ArtResolver::printMethodsForClass(char* className){
 
 jmethodID ArtResolver::findMethodClass(char* className, char* methodName){
     ArtClass* aclass = getRawClass(className);
-    
+    printf("%p\n", aclass);
     if(!aclass){
         return 0;
     }
@@ -222,20 +248,40 @@ jmethodID ArtResolver::findMethodClass(char* className, char* methodName){
     
     
     //we use https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/art_method.h;l=1026?q=Pretty&sq=&ss=android%2Fplatform%2Fsuperproject%2Fmain:art%2F
-
+    char* name;
+    std::string name_std_str;
     int i;
     for(i = 0; i<aclass->methods->size; i++){
-        std::string name_std_str = pretty_method(&methods[i], true);
-        char* name = (char*)name_std_str.c_str();
+        name_std_str = pretty_method(&methods[i], true);
+        name = (char*)name_std_str.c_str();
         if(strstr(name, methodName)){
             break;
         }
     }
+
+    //printf("name: %s\n", name);
     //printf("flags: %p\n", methods[i].access_flags);
-
-    return (jmethodID)&methods[i];
-
+    //printf("original method: %p\n", &methods[i]);
+    return (jmethodID)get_canonical_method(&methods[i], sizeof(size_t)); //the jmethodID
 }
+
+void ArtResolver::printException(){
+    Throwable* exception = ArtResolver::printException();
+    if(exception){
+        exception->printMessage();
+    }else{
+        printf("No exception\n");
+    }
+}
+
+void Throwable::printMessage(){
+    std::string exception = ArtResolver::dump_exception(this);
+    printf("Exception: %s", exception.c_str());
+}
+
+
+
+
 
 
 
