@@ -84,7 +84,17 @@ int main(){
   ArtResolver art_resolver(libart);
 
   art_resolver.enumerateClasses();
-  //art_resolver.printClassNames();
+ // art_resolver.printClassNames();
+
+  
+  //art_resolver.printMethodsForClass("android.app.ActivityThread");
+  jmethodID systemMain = art_resolver.findMethodClass("android.app.ActivityThread", "systemMain");
+  jclass activity_thread = ctx.env->FindClass("android/app/ActivityThread");
+  jobject activityThreadObj = ctx.env->CallStaticObjectMethod(activity_thread, systemMain);
+
+  printf("Activity Thread: %p\n", activityThreadObj);
+
+  //
 
   //printClasses(libart);
   return 0;

@@ -1,5 +1,6 @@
 #include <sys/system_properties.h>
 #include <stdlib.h>
+#include <string>
 #include "jenv.h"
 #include "jni.h"
 #include "elf_parser.hpp"
@@ -11,8 +12,9 @@
 
 AddGlobalRef ArtResolver::add_global_ref;
 visitClasses ArtResolver::visit_classes;
+PrettyMethod ArtResolver::pretty_method;
 std::vector<jobject>* ArtResolver::classHandles;
-std::vector<art_class>* ArtResolver::rawClasses;
+std::vector<ArtClass*>* ArtResolver::rawClasses;
 
 extern JavaCTX ctx;
 
@@ -31,11 +33,15 @@ ArtResolver::ArtResolver(struct proc_lib* libart){
     this->libart = libart;
 
     if(!ArtResolver::add_global_ref){
-       add_global_ref = (AddGlobalRef)find_dyn_symbol(this->libart, "_ZN3art9JavaVMExt12AddGlobalRefEPNS_6ThreadENS_6ObjPtrINS_6mirror6ObjectEEE");
+       add_global_ref = (AddGlobalRef)find_dyn_symbol(this->libart, "_ZN3art9JavaVMExt12AddGlobalRefEPNS_6ThreadENS_6ObjPtrINS_6mirror6ObjectEEE"); //JavaVMExt::AddGlobalRef
     }
 
     if(!ArtResolver::visit_classes){
        visit_classes = (visitClasses)find_dyn_symbol(this->libart, "_ZN3art11ClassLinker12VisitClassesEPNS_12ClassVisitorE"); //art::ClassLinker::VisitClasses
+    }
+
+    if(!ArtResolver::pretty_method){
+        pretty_method = (PrettyMethod)find_dyn_symbol(this->libart, "_ZN3art9ArtMethod12PrettyMethodEPS0_b"); //ArtMethod::PrettyMethod
     }
 
     if(!ArtResolver::classHandles){
@@ -43,7 +49,7 @@ ArtResolver::ArtResolver(struct proc_lib* libart){
     }
 
     if(!ArtResolver::rawClasses){
-       ArtResolver::rawClasses = new std::vector<art_class>();
+       ArtResolver::rawClasses = new std::vector<ArtClass*>();
     }
 
     
@@ -96,13 +102,14 @@ This is based on the technique from frida: https://github.com/frida/frida-java-b
 This function is also a prototype for: https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/class_linker.h;l=113;drc=a1df1ca465137bf665204c2757b7353c3a72c546?q=ClassVisitor&ss=android%2Fplatform%2Fsuperproject%2Fmain:art%2F
 
 */
-extern "C" bool get_class(struct ClassVisitor* cv, art_class klass){
+extern "C" bool get_class(struct ClassVisitor* cv, ArtClass* klass){
     //we need to add the class as a global ref because the ART VM won't accept a normal class 
     //https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/scoped_thread_state_change-inl.h;l=89;drc=13d7a47602f63cde716276908531eecb85813f7a;bpv=0;bpt=0 - this is how jobject/jclass are decoded.
     jobject new_ref  = ArtResolver::add_global_ref(ctx.vm, ArtResolver::getThread(), (jobject)klass);
    // printf("new class: %p\n", new_ref);
     ArtResolver::classHandles->push_back(new_ref);   
     ArtResolver::rawClasses->push_back(klass);
+
     return true;
 }
 
@@ -148,15 +155,19 @@ jobject ArtResolver::getClassHandle(char* name){
         char* className = (char*)ctx.env->GetStringUTFChars(nameString, &isCopy);
         
         if(!strcmp(name, className)){
-            ctx.env->ReleaseStringUTFChars(nameString, name);
+            ctx.env->ReleaseStringUTFChars(nameString, className);
             return classHandles->at(i);
         }
 
-        ctx.env->ReleaseStringUTFChars(nameString, name);
+        ctx.env->ReleaseStringUTFChars(nameString, className);
     }
+
+    return NULL;
 }
 
-art_class ArtResolver::getRawClass(char* name){
+
+
+ArtClass* ArtResolver::getRawClass(char* name){
     jclass javalangclass = ctx.env->FindClass("java/lang/Class");
     jmethodID getname = ctx.env->GetMethodID(javalangclass, "getName", "()Ljava/lang/String;");
     for(int i = 0; i < classHandles->size(); i++){
@@ -165,16 +176,66 @@ art_class ArtResolver::getRawClass(char* name){
 
         char* className = (char*)ctx.env->GetStringUTFChars(nameString, &isCopy);
         
-        if(!strcmp(name, className)){
-            ctx.env->ReleaseStringUTFChars(nameString, name);
+       // printf("Class Name: %s\n", className);
+        
+        if(!strcmp(className, name)){
+            ctx.env->ReleaseStringUTFChars(nameString, className);
             return rawClasses->at(i);
         }
 
-        ctx.env->ReleaseStringUTFChars(nameString, name);
+        ctx.env->ReleaseStringUTFChars(nameString, className);
+    }
+
+    return NULL;
+}
+
+void ArtResolver::printMethodsForClass(char* className){
+    //https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/mirror/class.h;l=1517;drc=13d7a47602f63cde716276908531eecb85813f7a - we're trying to get here
+
+    ArtClass* aclass = getRawClass(className);
+
+    if(!aclass){
+        return;
+    }
+
+    //the data contains an array of ArtMethod
+    ArtMethod* methods = (ArtMethod*)&aclass->methods->data[0];
+
+    printf("Num methods: %d\n", aclass->methods->size);
+    //we use https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/art_method.h;l=1026?q=Pretty&sq=&ss=android%2Fplatform%2Fsuperproject%2Fmain:art%2F
+
+    for(int i = 0; i<aclass->methods->size; i++){
+        std::string name_sig = pretty_method(&methods[i], true);
+        char* name = (char*)name_sig.c_str();
+        printf("%s\n", name);
     }
 }
 
-void ArtResolver::printMethods(art_class class){
+jmethodID ArtResolver::findMethodClass(char* className, char* methodName){
+    ArtClass* aclass = getRawClass(className);
+    
+    if(!aclass){
+        return 0;
+    }
+    //the data contains an array of ArtMethod
+    ArtMethod* methods = (ArtMethod*)&aclass->methods->data[0];
+    
+    
+    //we use https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/art_method.h;l=1026?q=Pretty&sq=&ss=android%2Fplatform%2Fsuperproject%2Fmain:art%2F
+
+    int i;
+    for(i = 0; i<aclass->methods->size; i++){
+        std::string name_std_str = pretty_method(&methods[i], true);
+        char* name = (char*)name_std_str.c_str();
+        if(strstr(name, methodName)){
+            break;
+        }
+    }
+    //printf("flags: %p\n", methods[i].access_flags);
+
+    return (jmethodID)&methods[i];
 
 }
+
+
 
