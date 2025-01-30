@@ -2,7 +2,9 @@ For this to work, push the apk to `/data/local/tmp/[yourapk].apk` and replace th
 
 The purpose of this is to be able to load a JNI shared object and then poke around it. The resulting executable is able to create a [`Context`](https://developer.android.com/reference/android/content/Context) and do most things that an Android app can do. 
 
-The objective here is to be able to create an environment in which one can poke around an android app without the need for Frida
+The objective here is to be able to create an environment in which one can poke around an android app without the need for Frida.
+
+This also has a series of utilities to be able to access generally in-accessible fields as well as call generally inaccessible methods by ripping the methodIDs and fieldIDs from art directly 
 
 Based on: 
 
