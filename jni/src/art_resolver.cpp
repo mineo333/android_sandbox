@@ -1,6 +1,7 @@
 #include <sys/system_properties.h>
 #include <stdlib.h>
 #include <string>
+#include <assert.h>
 #include "jenv.h"
 #include "jni.h"
 #include "elf_parser.hpp"
@@ -13,6 +14,7 @@
 AddGlobalRef ArtResolver::add_global_ref;
 visitClasses ArtResolver::visit_classes;
 PrettyMethod ArtResolver::pretty_method;
+PrettyField ArtResolver::pretty_field;
 Dump ArtResolver::dump_exception;
 GetCanonicalMethod ArtResolver::get_canonical_method;
 std::vector<jobject>* ArtResolver::classHandles;
@@ -36,24 +38,34 @@ ArtResolver::ArtResolver(struct proc_lib* libart){
 
     if(!ArtResolver::add_global_ref){
        add_global_ref = (AddGlobalRef)find_dyn_symbol(this->libart, (char*)"_ZN3art9JavaVMExt12AddGlobalRefEPNS_6ThreadENS_6ObjPtrINS_6mirror6ObjectEEE"); //JavaVMExt::AddGlobalRef
+       assert(add_global_ref);
     }
 
     if(!ArtResolver::visit_classes){
        visit_classes = (visitClasses)find_dyn_symbol(this->libart, (char*)"_ZN3art11ClassLinker12VisitClassesEPNS_12ClassVisitorE"); //art::ClassLinker::VisitClasses
+       assert(visit_classes);
     }
 
     if(!ArtResolver::pretty_method){
         pretty_method = (PrettyMethod)find_dyn_symbol(this->libart, (char*)"_ZN3art9ArtMethod12PrettyMethodEPS0_b"); //ArtMethod::PrettyMethod
+        assert(pretty_method);
     }
 
     if(!ArtResolver::get_canonical_method){
         get_canonical_method = (GetCanonicalMethod)find_dyn_symbol(this->libart, (char*)"_ZN3art9ArtMethod18GetCanonicalMethodENS_11PointerSizeE"); //ArtMethod::GetCanonicalMethod
+        assert(get_canonical_method);
+        
     }
 
     if(!ArtResolver::dump_exception){
-        dump_exception = (Dump)find_dyn_symbol(this->libart, (char*)"_ZN3art6mirror9Throwable4DumpEv"); 
+        dump_exception = (Dump)find_dyn_symbol(this->libart, (char*)"_ZN3art6mirror9Throwable4DumpEv"); //Throwable::Dump
+        assert(dump_exception);
     }
 
+    if(!ArtResolver::pretty_field) {
+        pretty_field = (PrettyField)find_dyn_symbol(this->libart, (char*)"_ZN3art8ArtField11PrettyFieldEb"); //ArtField::PrettyField
+        assert(pretty_field);
+    }
 
     if(!ArtResolver::classHandles){
        ArtResolver::classHandles = new std::vector<jobject>();
@@ -154,6 +166,44 @@ void ArtResolver::enumerateClasses(){
     free(cv);
 }
 
+void ArtResolver::printFields(char* name) {
+    ArtClass* art_class = getRawClass(name);
+    if(!art_class) {
+        return;
+    }
+    ArtField* field = (ArtField*)&art_class->fields->reserved; //we point to reserved because alignof(ArtField) == 4
+    
+
+    for(uint32_t i = 0; i<art_class->fields->size; i++, field++) {
+        std::string field_name = ArtResolver::pretty_field(field, false);
+        printf("%s\n", field_name.c_str());
+    }
+}
+//https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/jni/jni_internal.cc;l=426;drc=7e0718c02d9396171bfed752e95c84f1dbc979e6;bpv=0;bpt=1
+jfieldID ArtResolver::findField(char* class_name, char* field_name) {
+    ArtClass* art_class = getRawClass(class_name);
+    ArtField* field = (ArtField*)&art_class->fields->reserved;
+    if(!art_class) {
+        goto failed;
+    }
+    
+    
+
+    for(uint32_t i = 0; i<art_class->fields->size; i++, field++) {
+        std::string cur_field_name = ArtResolver::pretty_field(field, false);
+        const char* cstr = cur_field_name.c_str();
+        if(strstr(cstr, field_name)) {
+            return (jfieldID)field; //we need to deal with the special case here 
+        }
+    }
+
+
+failed:
+    return (jfieldID)-1;
+
+    
+}
+
 
 void ArtResolver::printClassNames(){
 
@@ -241,7 +291,6 @@ void ArtResolver::printMethodsForClass(char* className){
 
 jmethodID ArtResolver::findMethodClass(char* className, char* methodName){
     ArtClass* aclass = getRawClass(className);
-    printf("%p\n", aclass);
     if(!aclass){
         return 0;
     }

@@ -89,6 +89,8 @@ int main(){
   //art_resolver.printMethodsForClass("android.app.ActivityThread");
   jmethodID systemMain = art_resolver.findMethodClass("android.app.ActivityThread", "systemMain");
   jmethodID prepareMainLooper = art_resolver.findMethodClass("android.os.Looper", "prepareMainLooper");
+  
+  
   printf("system main: %p\n", systemMain);
   jclass activity_thread = ctx.env->FindClass("android/app/ActivityThread");
   jclass looper = ctx.env->FindClass("android/os/Looper");
@@ -96,12 +98,14 @@ int main(){
   printf("prepareMainLooper: %p\n", prepareMainLooper);
   //jobject activityThreadObj = ctx.env->NewObject(activity_thread, ctr);
   ctx.env->CallStaticObjectMethod(looper, prepareMainLooper);
-  printf("called main looper\n");
   jobject activityThreadObj = ctx.env->CallStaticObjectMethod(activity_thread, systemMain);
  // printf("Activity Thread: %p\n", activityThreadObj);
+  jfieldID context_impl = art_resolver.findField("android.app.ActivityThread", "mSystemContext");
+  
+  jobject context = ctx.env->GetObjectField(activityThreadObj, context_impl);
+  printf("Context: %p\n", context);
+
   Throwable* exception = ArtResolver::getException();
-  
-  
 
 
   if(exception)
