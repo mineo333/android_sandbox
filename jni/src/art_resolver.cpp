@@ -47,7 +47,7 @@ ArtResolver::ArtResolver(struct proc_lib* libart){
     }
 
     if(!ArtResolver::get_canonical_method){
-        get_canonical_method = (GetCanonicalMethod)find_dyn_symbol(this->libart, "_ZN3art9ArtMethod18GetCanonicalMethodENS_11PointerSizeE"); //ArtMethod::PrettyMethod
+        get_canonical_method = (GetCanonicalMethod)find_dyn_symbol(this->libart, "_ZN3art9ArtMethod18GetCanonicalMethodENS_11PointerSizeE"); //ArtMethod::GetCanonicalMethod
     }
 
     if(!ArtResolver::dump_exception){

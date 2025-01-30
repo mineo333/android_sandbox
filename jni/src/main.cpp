@@ -14,9 +14,9 @@
 
 
 JavaCTX ctx;
-struct JNINativeInterface jni_vtable;
+struct JNINativeInterface jni_vtable; //our own custom jni_vtable
 
-char* options[] = {"-Djava.class.path=/data/local/tmp/droidguard.apk", "-Djava.library.path=/data/local/tmp", "-verbose:jni"};
+char* options[] = {"-Djava.class.path=/data/local/tmp/pogo.apk", "-Djava.library.path=/data/local/tmp", "-verbose:jni"};
 
 void create_vm(){
   int res = init_java_env(&ctx, (char**)&options, 3);

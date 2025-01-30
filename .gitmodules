@@ -1,3 +1,0 @@
-[submodule "android-fuzzing"]
-	path = android-fuzzing
-	url = https://github.com/quarkslab/android-fuzzing.git
