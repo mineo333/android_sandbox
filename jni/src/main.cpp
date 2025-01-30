@@ -16,7 +16,7 @@
 JavaCTX ctx;
 struct JNINativeInterface jni_vtable; //our own custom jni_vtable
 
-char* options[] = {"-Djava.class.path=/data/local/tmp/pogo.apk", "-Djava.library.path=/data/local/tmp", "-verbose:jni"};
+char* options[] = {"-Djava.class.path=/data/local/tmp/droidguard.apk", "-Djava.library.path=/data/local/tmp", "-verbose:jni"};
 
 void create_vm(){
   int res = init_java_env(&ctx, (char**)&options, 3);
@@ -86,20 +86,26 @@ int main(){
   art_resolver.enumerateClasses();
 
   
- // art_resolver.printMethodsForClass("android.app.ActivityThread");
+  //art_resolver.printMethodsForClass("android.app.ActivityThread");
   jmethodID systemMain = art_resolver.findMethodClass("android.app.ActivityThread", "systemMain");
-  
+  jmethodID prepareMainLooper = art_resolver.findMethodClass("android.os.Looper", "prepareMainLooper");
   printf("system main: %p\n", systemMain);
   jclass activity_thread = ctx.env->FindClass("android/app/ActivityThread");
-  jmethodID ctr = ctx.env->GetMethodID(activity_thread, "<init>", "()V"); 
-  printf("constructor: %p\n", ctr);
-  jobject activityThreadObj = ctx.env->NewObject(activity_thread, ctr);
- // jobject activityThreadObj = ctx.env->CallStaticObjectMethod(activity_thread, systemMain);
-
+  jclass looper = ctx.env->FindClass("android/os/Looper");
+  
+  printf("prepareMainLooper: %p\n", prepareMainLooper);
+  //jobject activityThreadObj = ctx.env->NewObject(activity_thread, ctr);
+  ctx.env->CallStaticObjectMethod(looper, prepareMainLooper);
+  printf("called main looper\n");
+  jobject activityThreadObj = ctx.env->CallStaticObjectMethod(activity_thread, systemMain);
  // printf("Activity Thread: %p\n", activityThreadObj);
   Throwable* exception = ArtResolver::getException();
-  //printf("Exception Cause: %p\n", exception->cause);
-  exception->printMessage();
+  
+  
+
+
+  if(exception)
+    exception->printMessage();
   //
 
   //printClasses(libart);

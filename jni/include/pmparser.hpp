@@ -25,8 +25,4 @@ struct proc_lib {
 extern "C" struct proc_lib* find_library(char* name);
 
 
-
-
-
-
 #endif

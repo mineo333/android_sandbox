@@ -35,23 +35,23 @@ ArtResolver::ArtResolver(struct proc_lib* libart){
     this->libart = libart;
 
     if(!ArtResolver::add_global_ref){
-       add_global_ref = (AddGlobalRef)find_dyn_symbol(this->libart, "_ZN3art9JavaVMExt12AddGlobalRefEPNS_6ThreadENS_6ObjPtrINS_6mirror6ObjectEEE"); //JavaVMExt::AddGlobalRef
+       add_global_ref = (AddGlobalRef)find_dyn_symbol(this->libart, (char*)"_ZN3art9JavaVMExt12AddGlobalRefEPNS_6ThreadENS_6ObjPtrINS_6mirror6ObjectEEE"); //JavaVMExt::AddGlobalRef
     }
 
     if(!ArtResolver::visit_classes){
-       visit_classes = (visitClasses)find_dyn_symbol(this->libart, "_ZN3art11ClassLinker12VisitClassesEPNS_12ClassVisitorE"); //art::ClassLinker::VisitClasses
+       visit_classes = (visitClasses)find_dyn_symbol(this->libart, (char*)"_ZN3art11ClassLinker12VisitClassesEPNS_12ClassVisitorE"); //art::ClassLinker::VisitClasses
     }
 
     if(!ArtResolver::pretty_method){
-        pretty_method = (PrettyMethod)find_dyn_symbol(this->libart, "_ZN3art9ArtMethod12PrettyMethodEPS0_b"); //ArtMethod::PrettyMethod
+        pretty_method = (PrettyMethod)find_dyn_symbol(this->libart, (char*)"_ZN3art9ArtMethod12PrettyMethodEPS0_b"); //ArtMethod::PrettyMethod
     }
 
     if(!ArtResolver::get_canonical_method){
-        get_canonical_method = (GetCanonicalMethod)find_dyn_symbol(this->libart, "_ZN3art9ArtMethod18GetCanonicalMethodENS_11PointerSizeE"); //ArtMethod::GetCanonicalMethod
+        get_canonical_method = (GetCanonicalMethod)find_dyn_symbol(this->libart, (char*)"_ZN3art9ArtMethod18GetCanonicalMethodENS_11PointerSizeE"); //ArtMethod::GetCanonicalMethod
     }
 
     if(!ArtResolver::dump_exception){
-        dump_exception = (Dump)find_dyn_symbol(this->libart, "_ZN3art6mirror9Throwable4DumpEv"); 
+        dump_exception = (Dump)find_dyn_symbol(this->libart, (char*)"_ZN3art6mirror9Throwable4DumpEv"); 
     }
 
 
@@ -81,6 +81,7 @@ art_thread ArtResolver::getThread(){
 #define TLS_SLOT_ART_THREAD_SELF  7
     return (art_thread)tls[TLS_SLOT_ART_THREAD_SELF];
 }
+
 
 Throwable* ArtResolver::getException(){
     /*https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/thread.h;l=2177;drc=06bd5d4af5ec3ac61904303953b6f96bdf6eae4c
@@ -132,6 +133,7 @@ extern "C" bool get_class(struct ClassVisitor* cv, ArtClass* klass){
     //we need to add the class as a global ref because the ART VM won't accept a normal class 
     //https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/scoped_thread_state_change-inl.h;l=89;drc=13d7a47602f63cde716276908531eecb85813f7a;bpv=0;bpt=0 - this is how jobject/jclass are decoded.
     jobject new_ref  = ArtResolver::add_global_ref(ctx.vm, ArtResolver::getThread(), (jobject)klass);
+    //when returning a jclass, we always add a local reference https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/jni/jni_internal.cc;l=683;drc=7e0718c02d9396171bfed752e95c84f1dbc979e6;bpv=0;bpt=0?q=CallObjectMethod&ss=android%2Fplatform%2Fsuperproject%2Fmain, but a global reference is just as good
    // printf("new class: %p\n", new_ref);
     ArtResolver::classHandles->push_back(new_ref);   
     ArtResolver::rawClasses->push_back(klass);
@@ -262,11 +264,12 @@ jmethodID ArtResolver::findMethodClass(char* className, char* methodName){
     //printf("name: %s\n", name);
     //printf("flags: %p\n", methods[i].access_flags);
     //printf("original method: %p\n", &methods[i]);
+    //https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/jni/jni_internal.h;l=138;drc=7e0718c02d9396171bfed752e95c84f1dbc979e6;bpv=0;bpt=0
     return (jmethodID)get_canonical_method(&methods[i], sizeof(size_t)); //the jmethodID
 }
 
 void ArtResolver::printException(){
-    Throwable* exception = ArtResolver::printException();
+    Throwable* exception = ArtResolver::getException();
     if(exception){
         exception->printMessage();
     }else{
@@ -276,7 +279,7 @@ void ArtResolver::printException(){
 
 void Throwable::printMessage(){
     std::string exception = ArtResolver::dump_exception(this);
-    printf("Exception: %s", exception.c_str());
+    printf("Exception: %s\n", exception.c_str());
 }
 
 

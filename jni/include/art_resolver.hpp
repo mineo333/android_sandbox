@@ -53,10 +53,10 @@ typedef struct _ArtClass {
     heap_ref vtable; //java vtable
     uint64_t ifields;
     LengthPrefixedArray* methods; //this is a LengthPrefixedArray<ArtMethod>*: https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/mirror/class-inl.h;drc=13d7a47602f63cde716276908531eecb85813f7a;l=200 
-} ArtClass;
+} ArtClass; //this is usually passed as a ObjPtr<mirror::Class>
 
 
-//based on: 
+//based on: https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/art_method.h;l=87;drc=06bd5d4af5ec3ac61904303953b6f96bdf6eae4c?q=ArtMethod&ss=android%2Fplatform%2Fsuperproject%2Fmain
 typedef struct _ArtMethod {
     uint32_t declaring_class;
     uint32_t access_flags;
