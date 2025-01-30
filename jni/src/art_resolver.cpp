@@ -171,29 +171,29 @@ void ArtResolver::printFields(char* name) {
     if(!art_class) {
         return;
     }
-    ArtField* field = (ArtField*)&art_class->fields->reserved; //we point to reserved because alignof(ArtField) == 4
+    //ArtField* field = (ArtField*)&art_class->fields->reserved; //we point to reserved because alignof(ArtField) == 4
     
 
-    for(uint32_t i = 0; i<art_class->fields->size; i++, field++) {
-        std::string field_name = ArtResolver::pretty_field(field, false);
+    for(auto i = art_class->fields->begin(); i != art_class->fields->end(); ++i) {
+        std::string field_name = ArtResolver::pretty_field(&i, false);
         printf("%s\n", field_name.c_str());
     }
 }
 //https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/jni/jni_internal.cc;l=426;drc=7e0718c02d9396171bfed752e95c84f1dbc979e6;bpv=0;bpt=1
 jfieldID ArtResolver::findField(char* class_name, char* field_name) {
     ArtClass* art_class = getRawClass(class_name);
-    ArtField* field = (ArtField*)&art_class->fields->reserved;
+    //ArtField* field = (ArtField*)&art_class->fields->reserved;
     if(!art_class) {
         goto failed;
     }
     
     
 
-    for(uint32_t i = 0; i<art_class->fields->size; i++, field++) {
-        std::string cur_field_name = ArtResolver::pretty_field(field, false);
+    for(auto i = art_class->fields->begin(); i != art_class->fields->end(); ++i) {
+        std::string cur_field_name = ArtResolver::pretty_field(&i, false);
         const char* cstr = cur_field_name.c_str();
         if(strstr(cstr, field_name)) {
-            return (jfieldID)field; //we need to deal with the special case here 
+            return (jfieldID)&i; //we need to deal with the special case here 
         }
     }
 
@@ -277,13 +277,13 @@ void ArtResolver::printMethodsForClass(char* className){
     }
 
     //the data contains an array of ArtMethod
-    ArtMethod* methods = (ArtMethod*)&aclass->methods->data[0];
+   //ArtMethod* methods = (ArtMethod*)&aclass->methods->data[0];
 
     printf("Num methods: %d\n", aclass->methods->size);
     //we use https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/art_method.h;l=1026?q=Pretty&sq=&ss=android%2Fplatform%2Fsuperproject%2Fmain:art%2F
 
-    for(int i = 0; i<aclass->methods->size; i++){
-        std::string name_sig = pretty_method(&methods[i], true);
+    for(auto i = aclass->methods->begin(); i != aclass->methods->end(); ++i){
+        std::string name_sig = pretty_method(&i, true);
         char* name = (char*)name_sig.c_str();
         printf("%s\n", name);
     }
@@ -295,15 +295,14 @@ jmethodID ArtResolver::findMethodClass(char* className, char* methodName){
         return 0;
     }
     //the data contains an array of ArtMethod
-    ArtMethod* methods = (ArtMethod*)&aclass->methods->data[0];
     
     
     //we use https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/art_method.h;l=1026?q=Pretty&sq=&ss=android%2Fplatform%2Fsuperproject%2Fmain:art%2F
     char* name;
     std::string name_std_str;
-    int i;
-    for(i = 0; i<aclass->methods->size; i++){
-        name_std_str = pretty_method(&methods[i], true);
+    auto i = aclass->methods->begin();
+    for(; i != aclass->methods->end(); ++i){
+        name_std_str = pretty_method(&i, true);
         name = (char*)name_std_str.c_str();
         if(strstr(name, methodName)){
             break;
@@ -314,7 +313,7 @@ jmethodID ArtResolver::findMethodClass(char* className, char* methodName){
     //printf("flags: %p\n", methods[i].access_flags);
     //printf("original method: %p\n", &methods[i]);
     //https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/jni/jni_internal.h;l=138;drc=7e0718c02d9396171bfed752e95c84f1dbc979e6;bpv=0;bpt=0
-    return (jmethodID)get_canonical_method(&methods[i], sizeof(size_t)); //the jmethodID
+    return (jmethodID)get_canonical_method(&i, sizeof(size_t)); //the jmethodID
 }
 
 void ArtResolver::printException(){

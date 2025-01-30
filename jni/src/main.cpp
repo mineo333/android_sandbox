@@ -10,13 +10,13 @@
 #include "art_resolver.hpp"
 
 
-#define LIBART "/apex/com.android.art/lib64/libart.so" 
+#define LIBART (char*)"/apex/com.android.art/lib64/libart.so" 
 
 
 JavaCTX ctx;
 struct JNINativeInterface jni_vtable; //our own custom jni_vtable
 
-char* options[] = {"-Djava.class.path=/data/local/tmp/droidguard.apk", "-Djava.library.path=/data/local/tmp", "-verbose:jni"};
+char* options[] = {(char*)"-Djava.class.path=/data/local/tmp/droidguard.apk", (char*)"-Djava.library.path=/data/local/tmp", (char*)"-verbose:jni"};
 
 void create_vm(){
   int res = init_java_env(&ctx, (char**)&options, 3);
@@ -87,20 +87,20 @@ int main(){
 
   
   //art_resolver.printMethodsForClass("android.app.ActivityThread");
-  jmethodID systemMain = art_resolver.findMethodClass("android.app.ActivityThread", "systemMain");
-  jmethodID prepareMainLooper = art_resolver.findMethodClass("android.os.Looper", "prepareMainLooper");
+  jmethodID systemMain = art_resolver.findMethodClass((char*)"android.app.ActivityThread", (char*)"systemMain");
+  jmethodID prepareMainLooper = art_resolver.findMethodClass((char*)"android.os.Looper", (char*)"prepareMainLooper");
   
   
   printf("system main: %p\n", systemMain);
-  jclass activity_thread = ctx.env->FindClass("android/app/ActivityThread");
-  jclass looper = ctx.env->FindClass("android/os/Looper");
+  jclass activity_thread = ctx.env->FindClass((char*)"android/app/ActivityThread");
+  jclass looper = ctx.env->FindClass((char*)"android/os/Looper");
   
   printf("prepareMainLooper: %p\n", prepareMainLooper);
   //jobject activityThreadObj = ctx.env->NewObject(activity_thread, ctr);
   ctx.env->CallStaticObjectMethod(looper, prepareMainLooper);
   jobject activityThreadObj = ctx.env->CallStaticObjectMethod(activity_thread, systemMain);
  // printf("Activity Thread: %p\n", activityThreadObj);
-  jfieldID context_impl = art_resolver.findField("android.app.ActivityThread", "mSystemContext");
+  jfieldID context_impl = art_resolver.findField((char*)"android.app.ActivityThread", (char*)"mSystemContext");
   
   jobject context = ctx.env->GetObjectField(activityThreadObj, context_impl);
   printf("Context: %p\n", context);
@@ -110,8 +110,6 @@ int main(){
 
   if(exception)
     exception->printMessage();
-  //
 
-  //printClasses(libart);
   return 0;
 }

@@ -4,10 +4,8 @@
 #include "jni.h"
 #include <vector> 
 #include <stdint.h>
-
-
-#define ALIGN(x,a)              __ALIGN_MASK(x,(typeof(x))(a)-1)
-#define __ALIGN_MASK(x,mask)    (((x)+(mask))&~(mask))
+#include <iterator>
+#include "util.hpp"
 
 typedef void* classlinker;
 typedef void* art_runtime;
@@ -22,15 +20,47 @@ Decompress simply casts it back to its mirror type: https://cs.android.com/andro
 
 */
 typedef uint32_t heap_ref; 
-
-typedef struct _LengthPrefixedArray {
-    uint32_t size;
+template <typename T>
+class LengthPrefixedArray {
+    public:
     /**
     The data is the type itself: https://cs.android.com/android/platform/superproject/main/+/main:art/libartbase/base/length_prefixed_array.h;l=97;drc=06bd5d4af5ec3ac61904303953b6f96bdf6eae4c (notice how we are casting the offset to the pointer type)
     */
-    uint32_t reserved; //we need the extra reserved because for ArtMethod the alignment is 8 bytes, and data is initially at an offset of 4 bytes without the reserved.
-    uint8_t data[];  //the data contains the actual array elements themselvs
-} LengthPrefixedArray;
+    class iterator {
+        private:
+            T* ptr;
+        public: 
+            using iterator_category = std::forward_iterator_tag;
+            using value_type = T;
+            using difference_type = std::ptrdiff_t;
+            using pointer = T*;
+            using reference = T&;
+
+            explicit iterator(T* p) : ptr(p) {}
+
+
+            T& operator*() { return *ptr; }
+            T* operator->() { return ptr; }
+            T* operator&() { return ptr; }
+
+            iterator& operator++() {
+                ++ptr;
+                return *this;
+            }
+
+            bool operator==(const iterator& other) const { return ptr == other.ptr; }
+            bool operator!=(const iterator& other) const { return ptr != other.ptr; }
+    };
+
+
+    //utter woke C++ code 
+    iterator begin() { return iterator((T*)((char*)this + ALIGN(offsetof(LengthPrefixedArray, data), alignof(T)))); }
+    iterator end() { return iterator((T*)((char*)this + ALIGN(offsetof(LengthPrefixedArray, data), alignof(T))) + size); }
+
+    
+    uint32_t size;
+    uint8_t data[0];  //the data contains the actual array elements themselvs
+};
 
 
 //Based on: https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/mirror/object.h;l=805;drc=06bd5d4af5ec3ac61904303953b6f96bdf6eae4c
@@ -39,21 +69,7 @@ typedef struct _Object {
     uint32_t monitor;
 } Object;
 
-//based on: https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/mirror/class.h;l=1445;drc=13d7a47602f63cde716276908531eecb85813f7a 
-typedef struct _ArtClass {
-    //no vtable
-    Object object; //object is a superclass
-    heap_ref class_loader;
-    heap_ref component_type;
-    heap_ref dex_cache; 
-    heap_ref ext_data;
-    heap_ref iftable;
-    heap_ref name;
-    heap_ref superclass;
-    heap_ref vtable; //java vtable
-    LengthPrefixedArray* fields;
-    LengthPrefixedArray* methods; //this is a LengthPrefixedArray<ArtMethod>*: https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/mirror/class-inl.h;drc=13d7a47602f63cde716276908531eecb85813f7a;l=200 
-} ArtClass; //this is usually passed as a ObjPtr<mirror::Class>
+
 
 
 //based on: https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/art_method.h;l=87;drc=06bd5d4af5ec3ac61904303953b6f96bdf6eae4c?q=ArtMethod&ss=android%2Fplatform%2Fsuperproject%2Fmain
@@ -92,6 +108,23 @@ typedef struct _ArtField {
     uint32_t field_dex_idx;
     uint32_t offset;
 } ArtField;
+
+
+//based on: https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/mirror/class.h;l=1445;drc=13d7a47602f63cde716276908531eecb85813f7a 
+typedef struct _ArtClass {
+    //no vtable
+    Object object; //object is a superclass
+    heap_ref class_loader;
+    heap_ref component_type;
+    heap_ref dex_cache; 
+    heap_ref ext_data;
+    heap_ref iftable;
+    heap_ref name;
+    heap_ref superclass;
+    heap_ref vtable; //java vtable
+    LengthPrefixedArray<ArtField>* fields;
+    LengthPrefixedArray<ArtMethod>* methods; //this is a LengthPrefixedArray<ArtMethod>*: https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/mirror/class-inl.h;drc=13d7a47602f63cde716276908531eecb85813f7a;l=200 
+} ArtClass; //this is usually passed as a ObjPtr<mirror::Class>
 
 
 //Difference between jni_env and exception: https://cs.android.com/android/platform/superproject/main/+/main:art/runtime/thread.h;l=2177;drc=06bd5d4af5ec3ac61904303953b6f96bdf6eae4c
