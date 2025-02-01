@@ -6,6 +6,7 @@
 #include <linux/audit.h>    /* Definition of AUDIT_* constants */
 #include <linux/filter.h>
 #include <sys/syscall.h>    /* Definition of SYS_* constants */
+#include <signal.h>
 #include <unistd.h>
 #include <vector>
 #include <stdio.h>
@@ -57,14 +58,14 @@ int BpfHook::install() {
 
 
 int BpfHook::init() {
-    struct bpf_sigaction act = {
+    struct sigaction act = {
         0
     };
 
     act.sa_sigaction = trap_handler,
-    act.sa_flags = SA_SIGINFO,
-    printf("%d\n", syscall(SYS_rt_sigaction, SIGSYS, &act, NULL));
-    perror("Failed");
-    return 0;
+    act.sa_flags = SA_SIGINFO;
+    
+    int ret = sigaction(SIGSYS, &act, NULL);
+    return ret;
 }
 
