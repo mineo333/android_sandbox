@@ -92,3 +92,7 @@ extern "C" void* find_dyn_symbol(const struct proc_lib* lib, char* symbol_name){
     return NULL;
 }
 
+extern "C" void dump_plt(struct proc_lib* lib) {
+    
+}
+

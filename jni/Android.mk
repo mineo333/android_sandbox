@@ -23,7 +23,7 @@ LOCAL_MULTILIB := 64
 LOCAL_MODULE := play_integrity
 LOCAL_SHARED_LIBRARIES :=  jenv libdroidguard
 #LOCAL_SHARED_LIBRARIES += 
-LOCAL_SRC_FILES := src/main.cpp src/pmparser.cpp src/elf_parser.cpp src/art_resolver.cpp 
+LOCAL_SRC_FILES := src/main.cpp src/pmparser.cpp src/elf_parser.cpp src/art_resolver.cpp src/bpf_syscall.cpp
 LOCAL_C_INCLUDES := include
 
 include $(BUILD_EXECUTABLE)

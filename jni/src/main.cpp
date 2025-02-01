@@ -3,11 +3,15 @@
 #include "include/jni.h"
 #include "include/jenv.h"
 #include <sys/mman.h>
+#include <sys/syscall.h>
 #include <string.h>
+#include <unistd.h>
+#include <assert.h>
 #include <dlfcn.h>
 #include "pmparser.hpp"
 #include "elf_parser.hpp"
 #include "art_resolver.hpp"
+#include "bpf_syscall.hpp"
 
 
 #define LIBART (char*)"/apex/com.android.art/lib64/libart.so" 
@@ -107,9 +111,17 @@ int main(){
 
   Throwable* exception = ArtResolver::getException();
 
-
   if(exception)
     exception->printMessage();
 
+  printf("pid: %d\n", getpid());
+  printf("pid: %d\n", syscall(172));
+  std::vector<uint32_t> syscalls = { 172 };
+  BpfHook::init();
+  BpfHook hook = BpfHook(syscalls);
+  hook.install();
+  syscall(172);
+
+  
   return 0;
 }
