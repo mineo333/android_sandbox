@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <assert.h>
 #include <dlfcn.h>
+#include <fcntl.h>
+
 #include "pmparser.hpp"
 #include "elf_parser.hpp"
 #include "art_resolver.hpp"
@@ -114,14 +116,11 @@ int main(){
   if(exception)
     exception->printMessage();
 
-  printf("pid: %d\n", getpid());
-  printf("pid: %d\n", syscall(172));
-  std::vector<uint32_t> syscalls = { 172 };
+  printf("pid: %ld\n", getpid());
+  std::vector<uint32_t> syscalls = { 172, 63 };
   BpfHook::init();
-  BpfHook hook = BpfHook(syscalls);
+  BpfHook hook(syscalls);
   hook.install();
-  syscall(172);
-
   
   return 0;
 }
